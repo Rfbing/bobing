@@ -16,4 +16,5 @@ public class GetUserDataDao {
     	   	
     	return userRepository.findAll(PageRequest.of(0, ps, sort));
     }
+   
 }

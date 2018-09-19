@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.google.gson.Gson;
 import com.piggysoft.bobing.Constant.GlobalMap;
 import com.piggysoft.bobing.entity.Code;
+import com.piggysoft.bobing.entity.ImageAndMusicFile;
 import com.piggysoft.bobing.entity.WxSessionCode;
 import com.piggysoft.bobing.entity.WxToken;
 
@@ -36,7 +37,11 @@ public class Bobing {
 	private String SERVER_ERROR_STRING = "400\r\nthe page is missing";
 	private static Logger LOGGER = LoggerFactory.getLogger(Bobing.class);
 	@Value("${wxTokenPath}")
-	private String wxTokenPath;	
+	private String wxTokenPath;
+	@Value("${backgroundImage}")
+	private String backgroundImage;
+	@Value("${backgroundMusic}")
+	private String backgroundMusic;
 	/**
 	 * 获取token
 	 * @param request
@@ -44,7 +49,7 @@ public class Bobing {
 	 * @param cmddata
 	 * @return token
 	 */
-	@RequestMapping(value = "/account/wxLogin", method = RequestMethod.GET, produces = "application/json; charset=UTF-8")
+	@RequestMapping(value = "/account/wxLogin", method = RequestMethod.POST, produces = "application/json; charset=UTF-8")
 	public void getWxLoginToken(HttpServletRequest request, HttpServletResponse response,
 			 @RequestBody String codeData) {
 		PrintWriter writer = null;
@@ -75,6 +80,10 @@ public class Bobing {
 		String tokenStr = sessionCode.getSession_key();
 		//GlobalMap.userSessionkeyMap.put(key, value);
 		wxToken.setToken(tokenStr);
+		String tokenJsonStr = gson.toJson(wxToken);
+		//将微信给点session key传送回微信小程序界面js
+		writer.append(tokenJsonStr);
+		response.setStatus(HttpStatus.OK.value());
 		return ;
 		}catch (IOException exp) {
 			LOGGER.error(Arrays.toString(exp.getStackTrace()));
@@ -83,17 +92,48 @@ public class Bobing {
 			return;
 		}
 	}
-	@RequestMapping("/bobing/getFile")
-	public String getFileUrlPath() {
+	
+	@RequestMapping(value = "/bobing/getFile", method = RequestMethod.POST, produces = "application/json; charset=UTF-8")
+	public void getFileUrlPath(HttpServletRequest request, HttpServletResponse response) {
 		
-		return null;
+		ImageAndMusicFile imageAndMusicFile = new ImageAndMusicFile();
+		PrintWriter writer = null;
+		try {
+			writer = response.getWriter();
+			if(StringUtils.isEmpty(backgroundMusic) || StringUtils.isEmpty(backgroundImage)) {
+				response.setStatus(HttpStatus.BAD_REQUEST.value());
+				return;
+			}
+			imageAndMusicFile.setBackground_music(backgroundMusic);
+			imageAndMusicFile.setIndex_img(backgroundImage);
+			Gson gson = new Gson();
+			String fileStr = gson.toJson(imageAndMusicFile);
+			writer.append(fileStr);
+			response.setStatus(HttpStatus.OK.value());
+
+			return;
+		}catch (IOException exp) {
+			LOGGER.error(Arrays.toString(exp.getStackTrace()));
+			response.setStatus(HttpStatus.BAD_REQUEST.value());
+
+			return;
+		}
 	}
+	
+	/* 获得可博饼次数  ,更新用户信息，存入数据库
+	* 在map中绑定用户昵称和session_key，即头部的token字段
+	*  */
+	// /api/account/updateInfo
+	
+	
 	/* 获得可博饼次数 */
 	// /api/bobing/getDice
+	// DiceCount
 	
 	
 	/* 博饼投点 */
 	// /api/bobing/dice
+	// DiceResult
 	
 	/* 获取可分享次数 */
 	// /api/bobing/getShare
@@ -104,7 +144,6 @@ public class Bobing {
 	/* 获得自身排行 */
 	// /api/bobing/getSelfRank
 	
-	/* 获得可博饼次数   */
-	// /api/account/updateInfo
+	
 
 }
