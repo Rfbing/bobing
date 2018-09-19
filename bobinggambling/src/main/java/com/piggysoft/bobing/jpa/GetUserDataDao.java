@@ -30,7 +30,7 @@ public class GetUserDataDao {
      * @param avatarUrl
      * @return storeUser(user)
      */
-    boolean storeUser(String nickName, String avatarUrl) {
+    public boolean storeUser(String nickName, String avatarUrl) {
     	User user = new User();
     	user.setNickName(nickName);
     	user.setAvatarUrl(avatarUrl);
@@ -42,12 +42,24 @@ public class GetUserDataDao {
     	user.setGender(1);
     	return storeUser(user);
     }
+    public boolean storeUser(String nickName, String avatarUrl, int gender, String city) {
+    	User user = new User();
+    	user.setNickName(nickName);
+    	user.setAvatarUrl(avatarUrl);
+    	user.setBobingDescriptions("还未开始游戏");
+    	user.setCity(city);    	
+    	user.setHaveBobingTimes(defaultBobingTimes);
+    	user.setScores(0);
+    	user.setUsedBobingTimes(defaultUsedBobingTimes);
+    	user.setGender(gender);
+    	return storeUser(user);
+    }
     /**
      *  store a user
      * @param user
      * @return true if succ,or false otherwise
      */
-    boolean storeUser(User user) {
+    public  boolean storeUser(User user) {
     	if (user == null) {
 			return false;
 		}
@@ -58,7 +70,7 @@ public class GetUserDataDao {
     	return true;
     }
     
-    User findUserByNickName(String nickName) {
+    public User findUserByNickName(String nickName) {
     	if (StringUtils.isEmpty(nickName)) {
 			return null;
 		}    	
@@ -71,7 +83,7 @@ public class GetUserDataDao {
      * @param descriptions
      * @return false or true 
      */
-    boolean updateUserInfo(String nickName, int scores, String descriptions) {
+    public boolean updateUserInfo(String nickName, int scores, String descriptions) {
     	User userOld = findUserByNickName(nickName);
     	if (userOld == null) {
     		return false;	
@@ -93,7 +105,7 @@ public class GetUserDataDao {
      * @param addHaveTimes
      * @return
      */
-    boolean addUserBoBingTimes(String nickName, int addHaveTimes) {
+    public boolean addUserBoBingTimes(String nickName, int addHaveTimes) {
     	User userOld = findUserByNickName(nickName);
     	if (userOld == null) {
     		return false;	
@@ -107,7 +119,7 @@ public class GetUserDataDao {
      * @param nickName
      * @return
      */
-    int queryLegalBobingTimes(String nickName) {
+    public int queryLegalBobingTimes(String nickName) {
     	User userOld = findUserByNickName(nickName);
     	if (userOld == null) {
     		return 0;	

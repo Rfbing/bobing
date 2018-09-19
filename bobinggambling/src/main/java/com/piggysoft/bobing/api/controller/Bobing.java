@@ -3,6 +3,7 @@ package com.piggysoft.bobing.api.controller;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Arrays;
+import java.util.Random;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -25,17 +26,21 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.google.gson.Gson;
 import com.piggysoft.bobing.Constant.GlobalMap;
+import com.piggysoft.bobing.api.Utils.BobingToolUtils;
 import com.piggysoft.bobing.entity.Code;
+import com.piggysoft.bobing.entity.DiceCount;
 import com.piggysoft.bobing.entity.ImageAndMusicFile;
+import com.piggysoft.bobing.entity.User;
 import com.piggysoft.bobing.entity.WxSessionCode;
 import com.piggysoft.bobing.entity.WxToken;
+import com.piggysoft.bobing.jpa.GetUserDataDao;
 
 @RestController
 @RequestMapping("/api")
 public class Bobing {
-
-	private String SERVER_ERROR_STRING = "400\r\nthe page is missing";
 	private static Logger LOGGER = LoggerFactory.getLogger(Bobing.class);
+	private String SERVER_ERROR_STRING = "400\r\nthe page is missing";
+	private int RANDOM_STRING_LEN = 8;
 	@Value("${wxTokenPath}")
 	private String wxTokenPath;
 	@Value("${backgroundImage}")
@@ -77,8 +82,10 @@ public class Bobing {
 		String wxData = jserseyResp.getEntity().toString();
 		WxSessionCode sessionCode = gson.fromJson(wxData, WxSessionCode.class);
 		WxToken wxToken = new WxToken();
-		String tokenStr = sessionCode.getSession_key();
-		//GlobalMap.userSessionkeyMap.put(key, value);
+		String sessionCodeStr = sessionCode.getSession_key();
+		String tokenStr = BobingToolUtils.generateString(new Random(System.currentTimeMillis()), RANDOM_STRING_LEN);
+		
+		GlobalMap.userSessionkeyMap.put(tokenStr, sessionCodeStr);
 		wxToken.setToken(tokenStr);
 		String tokenJsonStr = gson.toJson(wxToken);
 		//将微信给点session key传送回微信小程序界面js
@@ -124,12 +131,80 @@ public class Bobing {
 	* 在map中绑定用户昵称和session_key，即头部的token字段
 	*  */
 	// /api/account/updateInfo
-	
+	@RequestMapping(value = "/account/updateInfo", method = RequestMethod.POST, produces = "application/json; charset=UTF-8")
+	public void updateInfo(HttpServletRequest request, HttpServletResponse response,@RequestBody String userInfoDataStr) {
+		
+		PrintWriter writer = null;
+		try {
+			writer = response.getWriter();			
+			Gson gson = new Gson();
+			User userDto = gson.fromJson(userInfoDataStr, User.class);
+			GetUserDataDao getUserDao = new GetUserDataDao();
+			String token = request.getHeader("token");
+			if (userDto == null || token == null) {
+				response.setStatus(HttpStatus.BAD_REQUEST.value());
+				writer.append(SERVER_ERROR_STRING);
+				return;
+			}
+			// check token in GlobalMap.userSessionkeyMap
+			String session_key = GlobalMap.userSessionkeyMap.get(token);
+			if (session_key == null) {
+				response.setStatus(HttpStatus.BAD_REQUEST.value());
+				writer.append(SERVER_ERROR_STRING);
+				return;
+			}
+			getUserDao.storeUser(userDto.getNickName(), userDto.getAvatarUrl(),
+					userDto.getGender(), userDto.getCity());
+			response.setStatus(HttpStatus.OK.value());
+			
+			return;
+		}catch (IOException exp) {
+			LOGGER.error(Arrays.toString(exp.getStackTrace()));
+			response.setStatus(HttpStatus.BAD_REQUEST.value());
+
+			return;
+		}
+	}
 	
 	/* 获得可博饼次数 */
 	// /api/bobing/getDice
 	// DiceCount
-	
+	@RequestMapping(value = "/bobing/getDice", method = RequestMethod.POST, produces = "application/json; charset=UTF-8")
+	public void getHaveBobingTimes(HttpServletRequest request, HttpServletResponse response,@RequestBody String userInfoDataStr) {
+		
+		PrintWriter writer = null;
+		try {
+			writer = response.getWriter();			
+			Gson gson = new Gson();
+			User userDto = gson.fromJson(userInfoDataStr, User.class);
+			GetUserDataDao getUserDao = new GetUserDataDao();
+			String token = request.getHeader("token");
+			if (userDto == null || token == null) {
+				response.setStatus(HttpStatus.BAD_REQUEST.value());
+				writer.append(SERVER_ERROR_STRING);
+				return;
+			}
+			// check token in GlobalMap.userSessionkeyMap
+			String session_key = GlobalMap.userSessionkeyMap.get(token);
+			if (session_key == null) {
+				response.setStatus(HttpStatus.BAD_REQUEST.value());
+				writer.append(SERVER_ERROR_STRING);
+				return;
+			}
+			int legalTimes = getUserDao.queryLegalBobingTimes(userDto.getNickName());
+			DiceCount diceCount = new DiceCount();
+			diceCount.setDice(legalTimes);
+			String diceTimesJson = gson.toJson(diceCount);
+			response.setStatus(HttpStatus.OK.value());
+			writer.append(diceTimesJson);
+			return;
+		}catch (IOException exp) {
+			LOGGER.error(Arrays.toString(exp.getStackTrace()));
+			response.setStatus(HttpStatus.BAD_REQUEST.value());
+
+			return;
+		}
+	}
 	
 	/* 博饼投点 */
 	// /api/bobing/dice
