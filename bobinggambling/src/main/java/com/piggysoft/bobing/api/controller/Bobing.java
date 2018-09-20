@@ -3,6 +3,7 @@ package com.piggysoft.bobing.api.controller;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Random;
 
 import javax.servlet.http.HttpServletRequest;
@@ -25,10 +26,12 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.google.gson.Gson;
+import com.piggysoft.bobing.Constant.BobinScoresDef;
 import com.piggysoft.bobing.Constant.GlobalMap;
 import com.piggysoft.bobing.api.Utils.BobingToolUtils;
 import com.piggysoft.bobing.entity.Code;
 import com.piggysoft.bobing.entity.DiceCount;
+import com.piggysoft.bobing.entity.DiceResult;
 import com.piggysoft.bobing.entity.ImageAndMusicFile;
 import com.piggysoft.bobing.entity.User;
 import com.piggysoft.bobing.entity.WxSessionCode;
@@ -209,7 +212,116 @@ public class Bobing {
 	/* 博饼投点 */
 	// /api/bobing/dice
 	// DiceResult
-	
+	@RequestMapping(value = "/bobing/dice", method = RequestMethod.POST, produces = "application/json; charset=UTF-8")
+	public void playDice(HttpServletRequest request, HttpServletResponse response,@RequestBody String userInfoDataStr) {
+		
+		PrintWriter writer = null;
+		try {
+			writer = response.getWriter();			
+			Gson gson = new Gson();
+			User userDto = gson.fromJson(userInfoDataStr, User.class);
+			GetUserDataDao getUserDao = new GetUserDataDao();
+			String token = request.getHeader("token");
+			if (userDto == null || token == null) {
+				response.setStatus(HttpStatus.BAD_REQUEST.value());
+				writer.append(SERVER_ERROR_STRING);
+				return;
+			}
+			// check token in GlobalMap.userSessionkeyMap
+			String session_key = GlobalMap.userSessionkeyMap.get(token);
+			if (session_key == null) {
+				response.setStatus(HttpStatus.BAD_REQUEST.value());
+				writer.append(SERVER_ERROR_STRING);
+				return;
+			}
+			int legalTimes = getUserDao.queryLegalBobingTimes(userDto.getNickName());
+			//play dice
+			if (legalTimes > 0) {
+				int []diceVars = new int[6];
+				int []result = new int[6];
+				for (int i = 0; i < diceVars.length; i++) {
+					 Random r = new Random();
+					 // bobing 1,2,3,4,5,6 点数
+				     int n2 = r.nextInt(6) + 1;
+					diceVars[i] = n2;
+					result[n2-1]++;
+				}
+				DiceResult diceResult = clacResult(result);
+				diceResult.setDice(diceVars);
+				String resultJsonStr = gson.toJson(diceResult);
+				response.setStatus(HttpStatus.OK.value());
+				writer.append(resultJsonStr);
+				return;
+			}
+			response.setStatus(HttpStatus.BAD_REQUEST.value());
+			writer.append(SERVER_ERROR_STRING);			
+			return;
+		}catch (IOException exp) {
+			LOGGER.error(Arrays.toString(exp.getStackTrace()));
+			response.setStatus(HttpStatus.BAD_REQUEST.value());
+
+			return;
+		}
+	}
+	/** 计算结果 **/
+	private DiceResult clacResult(int []result) {	
+//		int[] result = {0,4,0,0,0,0};//用来测试逻辑
+		String desc;
+		int scores = 0;
+		DiceResult diceResult = new DiceResult();
+		if(result[3] == 6) {			
+			desc = "六勃红";
+			scores = BobinScoresDef.ALL_FOUR;
+		}else if(result[3] == 5) {			
+			desc = "五红";
+			scores = BobinScoresDef.FIVE_FOUR;
+		}else if(result[3] == 4) {
+			if(result[0] == 2 && result[1] == 0 && result[2] == 0 && result[4] == 0 && result[5] == 0){				
+				desc = "状元插金花";
+				scores = BobinScoresDef.FOUR_FOUR_TWO_ONE;
+			}
+			else {				
+				desc = "四点红";
+				scores = BobinScoresDef.FOUR_FOUR;
+			}
+		}else if(result[3] == 3) {			
+			desc = "三红";
+			scores = BobinScoresDef.THREE_FOUR;
+		}else  if(result[0] == 6) {
+			desc = "遍地锦";
+			scores = BobinScoresDef.ALL_ONE;
+		}else if(result[1] == 6 || result[2] == 6 || result[4] == 6 || result[5] == 6) {			
+			desc = "六勃黑";
+			scores = BobinScoresDef.BLACK_SIX;
+		}else  if(result[0] == 5 || result[1] == 5 || result[2] == 5 || result[4] == 5 || result[5] == 5) {
+			if(result[3] == 1) {				
+				desc = "五子带一秀";
+				scores = BobinScoresDef.FIVE_STAGE;
+			}else {				
+				desc = "五子登科";
+				scores = BobinScoresDef.FIVE_STAGE;
+			}
+		} else if(result[0]==1 && result[1]==1 && result[2]==1 && result[3]==1 && result[4]==1 && result[5]==1) {			
+			desc = "对堂";
+			scores = BobinScoresDef.ONE_TO_SIX;
+		}else if(result[0] == 4 || result[1] == 4 || result[2] == 4 || result[4] == 4 || result[5] == 4) {			
+			desc = "四进";
+			scores = BobinScoresDef.FOUR_OR;
+		}else if(result[3] == 2 && (result[0] != 4 || result[1] != 4 || result[2] != 4 || result[4] != 4 || result[5] != 4)) {
+			
+			desc = "二举";
+			scores = BobinScoresDef.TWO_FOUR;
+		}else if(result[3] == 1 && (result[0] != 4 || result[1] != 4 || result[2] != 4 || result[4] != 4 || result[5] != 4)) {
+			
+			desc = "一秀";
+			scores = BobinScoresDef.ONE_FOUR;
+		}else {
+			desc = "什么也没有！";
+		}
+		diceResult.getResult().setName(desc);
+		diceResult.getResult().setScore(scores);
+		return diceResult;
+	}
 	/* 获取可分享次数 */
 	// /api/bobing/getShare
 	
